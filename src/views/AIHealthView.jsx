@@ -1,157 +1,213 @@
 import React, { useState } from 'react';
-import { Activity, ShieldAlert, Sparkles, AlertTriangle, CheckCircle2, Send, Bot, User, Thermometer, Stethoscope } from 'lucide-react';
+import { Sparkles, Stethoscope, DollarSign, Send, Bot, User, Loader2 } from 'lucide-react';
 
-export const AIHealthView = () => {
-  const [messages, setMessages] = useState([
-    { id: 1, sender: 'ai', text: 'Hola Kevin. He analizado los datos biométricos recientes del Hato. El Potrero 3 muestra un índice de humedad elevado que podría propiciar parásitos en los terneros. ¿Deseas que genere una recomendación de rotación preventiva?' }
-  ]);
-  const [inputMessage, setInputMessage] = useState('');
+export const AIHealthView = ({ texts }) => {
+  const [activeTab, setActiveTab] = useState('veterinary'); // 'veterinary' | 'financial' | 'general'
+  const [prompt, setPrompt] = useState('');
+  const [loading, setLoading] = useState(false);
+  
+  // Historial de chat independiente por cada subsección
+  const [chats, setChats] = useState({
+    veterinary: [
+      { role: 'assistant', content: 'Hola. Soy tu Asistente Veterinario IA de RebañoPro. Describe los síntomas o el comportamiento anómalo de algún espécimen para recibir un protocolo preliminar de evaluación clínica.' }
+    ],
+    financial: [
+      { role: 'assistant', content: 'Hola. Soy tu Asesor Financiero Pecuario. Puedo analizar los costos de alimentación, sanidad y márgenes de rentabilidad de tu hato.' }
+    ],
+    general: [
+      { role: 'assistant', content: 'Hola. Soy el núcleo de Inteligencia de RebañoPro. ¿En qué aspecto estratégico de la gestión de tu finca te puedo colaborar hoy?' }
+    ]
+  });
 
-  const handleSendMessage = (e) => {
+  const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!inputMessage.trim()) return;
+    if (!prompt.trim() || loading) return;
 
-    const userMsg = { id: Date.now(), sender: 'user', text: inputMessage };
-    setMessages(prev => [...prev, userMsg]);
-    setInputMessage('');
+    const userMsg = prompt.trim();
+    setPrompt('');
 
-    // Simulando respuesta de la IA de RebañoPro
-    setTimeout(() => {
-      const aiResponse = {
-        id: Date.now() + 1,
-        sender: 'ai',
-        text: 'Entendido. He registrado la instrucción en el sistema y actualizado las alertas sanitarias para el lote correspondiente.'
-      };
-      setMessages(prev => [...prev, aiResponse]);
-    }, 1000);
+    // Añadir mensaje del usuario al chat activo
+    const updatedHistory = [...chats[activeTab], { role: 'user', content: userMsg }];
+    setChats({ ...chats, [activeTab]: updatedHistory });
+    setLoading(true);
+
+    try {
+      // Tu clave de API oficial de Gemini
+      const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';      let aiResponse = '';
+
+      // Conexión real con el modelo Gemini Flash
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
+      
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json' 
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: `Eres un experto consultor agropecuario, veterinario y financiero para software de hato ganadero llamado RebañoPro. Responde de forma técnica, concisa y profesional en español. Contexto actual de la sección: ${activeTab}. Pregunta del productor: ${userMsg}`
+                }
+              ]
+            }
+          ]
+        })
+      });
+
+      const data = await res.json();
+      
+      if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
+        aiResponse = data.candidates[0].content.parts[0].text;
+      } else if (data.error) {
+        throw new Error(data.error.message || 'Error en la respuesta de la API');
+      } else {
+        throw new Error('No se pudo interpretar la respuesta del servidor de IA.');
+      }
+
+      setChats({
+        ...chats,
+        [activeTab]: [...updatedHistory, { role: 'assistant', content: aiResponse }]
+      });
+
+    } catch (error) {
+      console.error("Error en llamada IA:", error);
+      setChats({
+        ...chats,
+        [activeTab]: [
+          ...updatedHistory, 
+          { 
+            role: 'assistant', 
+            content: `⚠️ Error de conexión con Gemini: ${error.message}. Por favor, verifica tu clave de API o conexión.` 
+          }
+        ]
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="space-y-6">
-      {/* Cabecera de la Vista */}
+      
+      {/* Cabecera corporativa */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <span className="text-[11px] font-semibold tracking-wider text-emerald-600 uppercase bg-emerald-50 px-2.5 py-1 rounded-full">
-            Motor de Inteligencia Artificial
+          <span className="text-[11px] font-semibold tracking-wider text-emerald-600 uppercase bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">
+            {texts.aiTag}
           </span>
-          <h1 className="text-2xl font-bold text-slate-800 tracking-tight mt-1">Salud e Inteligencia Artificial</h1>
-          <p className="text-sm text-slate-500 mt-1">Diagnósticos predictivos, alertas sanitarias automatizadas y asistente inteligente para el hato.</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200/50 text-emerald-700 text-xs font-semibold px-3 py-1.5 rounded-xl">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            IA Activa y Sincronizada
-          </span>
+          <h1 className="text-2xl font-bold text-slate-800 tracking-tight mt-1">{texts.aiTitle}</h1>
+          <p className="text-sm text-slate-500 mt-1">{texts.aiSub}</p>
         </div>
       </div>
 
-      {/* Grid Superior: Tarjetas de Alertas Sanitarias Críticas */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Riesgo Sanitario Detectado</span>
-            <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
-              <ShieldAlert className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="mt-4">
-            <h3 className="text-lg font-bold text-slate-800">Alerta de Parásitos (Lote 3)</h3>
-            <p className="text-xs text-slate-500 mt-1">Detectado por correlación de humedad en suelo y comportamiento de consumo.</p>
-          </div>
-          <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
-            <span className="text-rose-600 font-semibold">Acción requerida</span>
-            <button className="text-emerald-600 font-bold hover:underline">Ver protocolo →</button>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Vacunación Próxima</span>
-            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-              <Thermometer className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="mt-4">
-            <h3 className="text-lg font-bold text-slate-800">Fiebre Aftosa (Ciclo B)</h3>
-            <p className="text-xs text-slate-500 mt-1">Programado para el 15 de Octubre de 2026. 100% del hato por inocular.</p>
-          </div>
-          <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
-            <span className="text-amber-600 font-semibold">En 34 días</span>
-            <button className="text-emerald-600 font-bold hover:underline">Programar lote →</button>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Estado General del Hato</span>
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-              <CheckCircle2 className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="mt-4">
-            <h3 className="text-lg font-bold text-slate-800">96.8% Saludable</h3>
-            <p className="text-xs text-slate-500 mt-1">Solo 4 animales bajo seguimiento veterinario secundario.</p>
-          </div>
-          <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
-            <span className="text-emerald-600 font-semibold">Estable</span>
-            <span className="text-slate-400">Actualizado hace 1h</span>
-          </div>
-        </div>
-
+      {/* Pestañas de Navegación del Centro de IA */}
+      <div className="flex items-center gap-2 border-b border-slate-200 pb-3 overflow-x-auto">
+        <button
+          onClick={() => setActiveTab('veterinary')}
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+            activeTab === 'veterinary' 
+              ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20' 
+              : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+          }`}
+        >
+          <Stethoscope className="w-4 h-4" /> {texts.aiTabVet}
+        </button>
+        <button
+          onClick={() => setActiveTab('financial')}
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+            activeTab === 'financial' 
+              ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20' 
+              : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+          }`}
+        >
+          <DollarSign className="w-4 h-4" /> {texts.aiTabFin}
+        </button>
+        <button
+          onClick={() => setActiveTab('general')}
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+            activeTab === 'general' 
+              ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20' 
+              : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+          }`}
+        >
+          <Sparkles className="w-4 h-4" /> {texts.aiTabGen}
+        </button>
       </div>
 
-      {/* Sección Inferior: Asistente IA Interactivo */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col h-[500px]">
+      {/* Contenedor Principal del Chat IA */}
+      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex flex-col h-[550px]">
         
-        {/* Cabecera del Chat */}
-        <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-md shadow-emerald-600/20">
-            <Sparkles className="w-4 h-4" />
+        {/* Barra superior de estado */}
+        <div className="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between px-6">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold border border-emerald-100">
+              {activeTab === 'veterinary' ? <Stethoscope className="w-5 h-5" /> : activeTab === 'financial' ? <DollarSign className="w-5 h-5" /> : <Sparkles className="w-5 h-5" />}
+            </div>
+            <div>
+              <h3 className="text-xs font-bold text-slate-800">
+                {activeTab === 'veterinary' ? 'Módulo de Diagnóstico Clínico y Sanidad Animal' : activeTab === 'financial' ? 'Módulo de Análisis de Costos y Márgenes de Ganancia' : 'Consultor General de Gestión Pecuaria'}
+              </h3>
+              <p className="text-[11px] text-slate-400">Modelo conectado: Google Gemini 3.8 Flash</p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-xs font-bold text-slate-800">Asistente Predictivo Veterinario RebañoPro</h3>
-            <p className="text-[11px] text-slate-400">Entrenado con métricas de biomasa, clima e historiales sanitarios.</p>
-          </div>
+          <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">
+            IA Activa Online
+          </span>
         </div>
 
-        {/* Cuerpo de Mensajes */}
-        <div className="flex-1 p-6 overflow-y-auto space-y-4 bg-slate-50/30">
-          {messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`flex items-start gap-3 max-w-xl ${msg.sender === 'user' ? 'ml-auto flex-row-reverse' : ''}`}
-            >
+        {/* Historial de Mensajes */}
+        <div className="flex-1 p-6 overflow-y-auto space-y-4 bg-slate-50/40">
+          {chats[activeTab].map((msg, index) => (
+            <div key={index} className={`flex items-start gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
               <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
-                msg.sender === 'ai' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-800 text-white'
+                msg.role === 'user' ? 'bg-slate-800 text-white' : 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
               }`}>
-                {msg.sender === 'ai' ? <Bot className="w-4 h-4" /> : <User className="w-4 h-4" />}
+                {msg.role === 'user' ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
               </div>
-              <div className={`p-4 rounded-2xl text-xs leading-relaxed shadow-sm ${
-                msg.sender === 'ai' 
-                  ? 'bg-white text-slate-700 border border-slate-100 rounded-tl-none' 
-                  : 'bg-emerald-600 text-white rounded-tr-none'
+              <div className={`max-w-xl p-4 rounded-2xl text-xs leading-relaxed whitespace-pre-line ${
+                msg.role === 'user' 
+                  ? 'bg-slate-800 text-white rounded-tr-none' 
+                  : 'bg-white border border-slate-100 text-slate-700 shadow-sm rounded-tl-none font-medium'
               }`}>
-                {msg.text}
+                {msg.content}
               </div>
             </div>
           ))}
+          {loading && (
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-md">
+                <Bot className="w-4 h-4" />
+              </div>
+              <div className="bg-white border border-slate-100 p-3.5 rounded-2xl shadow-sm flex items-center gap-2 text-xs text-slate-500">
+                <Loader2 className="w-4 h-4 animate-spin text-emerald-600" /> Analizando consulta pecuaria...
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Barra de Entrada de Texto */}
-        <form onSubmit={handleSendMessage} className="p-4 border-t border-slate-100 bg-white flex items-center gap-3">
+        {/* Formulario de Envío de Pregunta */}
+        <form onSubmit={handleSendMessage} className="p-4 bg-white border-t border-slate-100 flex items-center gap-3">
           <input
             type="text"
-            placeholder="Pregúntale a la IA sobre síntomas, rotación de potreros o planes de vacunación..."
-            value={inputMessage}
-            onChange={(e) => setInputMessage(e.target.value)}
-            className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs text-slate-800 focus:outline-none focus:border-emerald-500 transition-all"
+            placeholder={
+              activeTab === 'veterinary' 
+                ? 'Ej. Vaca Holstein con decaimiento, fiebre y baja ingesta de agua...' 
+                : activeTab === 'financial' 
+                ? 'Ej. ¿Cómo puedo optimizar los costos en suplementos este mes?' 
+                : 'Escribe tu consulta general sobre el hato...'
+            }
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs text-slate-800 focus:outline-none focus:border-emerald-500 shadow-sm"
           />
           <button
             type="submit"
-            className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-xl text-xs font-bold shadow-md shadow-emerald-600/20 transition-all flex items-center gap-2"
+            disabled={loading}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-5 py-3 rounded-xl shadow-md shadow-emerald-600/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
           >
-            <Send className="w-4 h-4" /> Enviar
+            <Send className="w-4 h-4" /> {texts.aiSend}
           </button>
         </form>
 
