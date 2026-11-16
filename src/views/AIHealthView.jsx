@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Sparkles, Stethoscope, DollarSign, Send, Bot, User, Loader2 } from 'lucide-react';
+import { Sparkles, Stethoscope, DollarSign, Send, Bot, User, Loader2, AlertCircle } from 'lucide-react';
+import { consultClaudeAI } from '../services/claudeService'; // Importamos el servicio centralizado
 
 export const AIHealthView = ({ texts }) => {
   const [activeTab, setActiveTab] = useState('veterinary'); // 'veterinary' | 'financial' | 'general'
@@ -9,7 +10,7 @@ export const AIHealthView = ({ texts }) => {
   // Historial de chat independiente por cada subsección
   const [chats, setChats] = useState({
     veterinary: [
-      { role: 'assistant', content: 'Hola. Soy tu Asistente Veterinario IA de RebañoPro. Describe los síntomas o el comportamiento anómalo de algún espécimen para recibir un protocolo preliminar de evaluación clínica.' }
+      { role: 'assistant', content: 'Hola. Soy tu Asistente Veterinario IA de RebañoPro (respaldado por Claude). Describe los síntomas o el comportamiento anómalo de algún espécimen para recibir un protocolo preliminar de evaluación clínica.' }
     ],
     financial: [
       { role: 'assistant', content: 'Hola. Soy tu Asesor Financiero Pecuario. Puedo analizar los costos de alimentación, sanidad y márgenes de rentabilidad de tu hato.' }
@@ -32,45 +33,8 @@ export const AIHealthView = ({ texts }) => {
     setLoading(true);
 
     try {
-      // Leer la clave de API oficial de Gemini desde las variables de entorno de Vite
-      const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || ''; 
-      
-      if (!GEMINI_API_KEY) {
-        throw new Error('Falta definir VITE_GEMINI_API_KEY en tu archivo .env');
-      }
-
-      let aiResponse = '';
-
-      // ⚡ CORRECCIÓN CLAVE: Actualizado al modelo gemini-3.8-flash que exige la API actual
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${GEMINI_API_KEY}`;
-      
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json' 
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: `Eres un experto consultor agropecuario, veterinario y financiero para software de hato ganadero llamado RebañoPro. Responde de forma técnica, concisa y profesional en español. Contexto actual de la sección: ${activeTab}. Pregunta del productor: ${userMsg}`
-                }
-              ]
-            }
-          ]
-        })
-      });
-
-      const data = await res.json();
-      
-      if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
-        aiResponse = data.candidates[0].content.parts[0].text;
-      } else if (data.error) {
-        throw new Error(data.error.message || 'Error en la respuesta de la API');
-      } else {
-        throw new Error('No se pudo interpretar la respuesta del servidor de IA.');
-      }
+      // Llamada limpia al servicio modular de Claude
+      const aiResponse = await consultClaudeAI(activeTab, userMsg);
 
       setChats({
         ...chats,
@@ -78,14 +42,14 @@ export const AIHealthView = ({ texts }) => {
       });
 
     } catch (error) {
-      console.error("Error en llamada IA:", error);
+      console.error("Error en llamada IA Claude:", error);
       setChats({
         ...chats,
         [activeTab]: [
           ...updatedHistory, 
           { 
             role: 'assistant', 
-            content: `⚠️ Error de conexión con Gemini: ${error.message}. Por favor, verifica tu clave de API en el archivo .env y reinicia el servidor.` 
+            content: `⚠️ Error de conexión con Anthropic: ${error.message}. Por favor, verifica tu clave de API (VITE_ANTHROPIC_API_KEY) en el archivo .env y reinicia el servidor.` 
           }
         ]
       });
@@ -155,11 +119,11 @@ export const AIHealthView = ({ texts }) => {
               <h3 className="text-xs font-bold text-slate-800">
                 {activeTab === 'veterinary' ? 'Módulo de Diagnóstico Clínico y Sanidad Animal' : activeTab === 'financial' ? 'Módulo de Análisis de Costos y Márgenes de Ganancia' : 'Consultor General de Gestión Pecuaria'}
               </h3>
-              <p className="text-[11px] text-slate-400">Modelo conectado: Google Gemini 3.8 Flash</p>
+              <p className="text-[11px] text-slate-400">Modelo conectado: Claude 3.5 Sonnet (Anthropic)</p>
             </div>
           </div>
-          <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">
-            IA Activa Online
+          <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100 flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> IA Activa Online
           </span>
         </div>
 
@@ -186,8 +150,8 @@ export const AIHealthView = ({ texts }) => {
               <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-md">
                 <Bot className="w-4 h-4" />
               </div>
-              <div className="bg-white border border-slate-100 p-3.5 rounded-2xl shadow-sm flex items-center gap-2 text-xs text-slate-500">
-                <Loader2 className="w-4 h-4 animate-spin text-emerald-600" /> Analizando consulta pecuaria...
+              <div className="bg-white border border-slate-100 p-3.5 rounded-2xl shadow-sm flex items-center gap-2 text-xs text-slate-500 font-medium">
+                <Loader2 className="w-4 h-4 animate-spin text-emerald-600" /> Claude está analizando tu consulta pecuaria...
               </div>
             </div>
           )}
@@ -206,7 +170,7 @@ export const AIHealthView = ({ texts }) => {
             }
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs text-slate-800 focus:outline-none focus:border-emerald-500 shadow-sm"
+            className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs text-slate-800 focus:outline-none focus:border-emerald-500 shadow-sm transition-all"
           />
           <button
             type="submit"
