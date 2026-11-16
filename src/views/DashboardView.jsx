@@ -1,34 +1,50 @@
-import React from 'react';
-import { Users, MapPin, DollarSign, AlertTriangle, Zap, TrendingUp, ArrowRight, BarChart3 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../services/supabaseClient';
+import { Users, MapPin, DollarSign, AlertTriangle, Zap, TrendingUp, ArrowRight, BarChart3, Loader2, Plus } from 'lucide-react';
 
-export const DashboardView = ({ isDarkMode, texts }) => {
-  // 1. Obtener datos reales del usuario logueado desde localStorage
-  const currentUser = JSON.parse(localStorage.getItem('rebanopro_user'));
-  const userEmail = currentUser?.email || 'default';
+export const DashboardView = ({ isDarkMode, texts, onNavigate, onGenerateReport }) => {
+  const [animals, setAnimals] = useState([]);
+  const [potreros, setPotreros] = useState([]);
+  const [transactions, setTransactions] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Cargar animales reales (o vacío si no hay)
-  const savedAnimals = localStorage.getItem(`rebanopro_animals_${userEmail}`);
-  const animals = savedAnimals ? JSON.parse(savedAnimals) : [];
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
 
-  // Cargar potreros reales (o vacío si no hay)
-  const savedPotreros = localStorage.getItem(`rebanopro_potreros_${userEmail}`) || localStorage.getItem(`rebanopro_hectares_${userEmail}`);
-  const potreros = savedPotreros ? JSON.parse(savedPotreros) : [];
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
 
-  // Cargar finanzas reales (o vacío si no hay)
-  const savedFinance = localStorage.getItem(`rebanopro_finance_${userEmail}`);
-  const transactions = savedFinance ? JSON.parse(savedFinance) : [];
+      const { data: animalsData, error: animalsError } = await supabase.from('animals').select('*');
+      if (animalsError) throw animalsError;
 
-  // Cálculos dinámicos
+      const { data: pasturesData, error: pasturesError } = await supabase.from('pastures').select('*');
+      if (pasturesError) throw pasturesError;
+
+      const { data: txData, error: txError } = await supabase.from('transactions').select('*');
+      if (txError) throw txError;
+
+      setAnimals(animalsData || []);
+      setPotreros(pasturesData || []);
+      setTransactions(txData || []);
+    } catch (error) {
+      console.error('Error al cargar datos del Dashboard:', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const totalAnimalsCount = animals.length;
   
   const totalHectaresArea = potreros.reduce((acc, curr) => {
-    const areaVal = parseFloat(curr.area || curr.size || 0);
+    const areaVal = parseFloat(curr.hectares || 0);
     return acc + (isNaN(areaVal) ? 0 : areaVal);
   }, 0);
 
   const totalMonthlyExpenses = transactions
-    .filter(t => t.type === 'expense')
-    .reduce((acc, curr) => acc + Math.abs(curr.rawAmount || parseFloat(curr.amount?.replace(/[^0-9.-]+/g, "")) || 0), 0);
+    .filter(t => t.type === 'Gasto')
+    .reduce((acc, curr) => acc + Math.abs(parseFloat(curr.amount) || 0), 0);
 
   const cardClass = `p-6 rounded-3xl border shadow-sm transition-colors ${
     isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-100 text-slate-900'
@@ -36,10 +52,18 @@ export const DashboardView = ({ isDarkMode, texts }) => {
   
   const iconBgClass = "w-10 h-10 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center";
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-32">
+        <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" />
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
+    <div className="space-y-8 animate-fadeIn">
       
-      {/* Cabecera de la Vista */}
+      {/* Cabecera con Botones Interactivos Conectados */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className={`text-2xl font-bold tracking-tight ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>
@@ -50,21 +74,28 @@ export const DashboardView = ({ isDarkMode, texts }) => {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <button className={`px-4 py-2.5 rounded-xl border text-xs font-semibold cursor-pointer flex items-center gap-2 transition-all ${
-            isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-          }`}>
-            <BarChart3 className="w-4 h-4" /> {texts?.dbReport || 'Generar Reporte'}
+          {/* Botón Generar Reporte */}
+          <button 
+            onClick={onGenerateReport}
+            className={`px-4 py-2.5 rounded-xl border text-xs font-semibold cursor-pointer flex items-center gap-2 transition-all ${
+              isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            <BarChart3 className="w-4 h-4 text-emerald-600" /> {texts?.dbReport || 'Generar Reporte'}
           </button>
-          <button className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer flex items-center gap-2 transition-all shadow-md shadow-emerald-600/20 active:scale-95">
-            + {texts?.dbRegister || 'Registrar Animal / Lote'}
+
+          {/* Botón Registrar Animal / Lote */}
+          <button 
+            onClick={() => onNavigate && onNavigate('inventory')}
+            className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer flex items-center gap-2 transition-all shadow-md shadow-emerald-600/20 active:scale-95"
+          >
+            <Plus className="w-4 h-4" /> {texts?.dbRegister || 'Registrar Animal / Lote'}
           </button>
         </div>
       </div>
 
-      {/* Grid de KPIs con Datos Reales */}
+      {/* Grid de KPIs con datos reales de Supabase */}
       <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
-        
-        {/* Tarjeta 1: Total Animales */}
         <div className={`${cardClass} flex flex-col justify-between h-full`}>
             <div className="flex items-center justify-between gap-4">
                 <span className={`text-sm font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>{texts?.totalAnimals || 'Total de Animales'}</span>
@@ -73,12 +104,11 @@ export const DashboardView = ({ isDarkMode, texts }) => {
             <div className="mt-4">
                 <p className="text-3xl font-extrabold tracking-tight">{totalAnimalsCount}</p>
                 <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mt-1 flex items-center gap-1">
-                    <TrendingUp className="w-3 h-3" /> Sincronizado <span className='text-slate-400'>en vivo</span>
+                    <TrendingUp className="w-3 h-3" /> Sincronizado <span className='text-slate-400'>en Supabase</span>
                 </p>
             </div>
         </div>
         
-        {/* Tarjeta 2: Hectáreas Activas */}
         <div className={cardClass}>
             <div className="flex items-center justify-between gap-4">
                 <span className={`text-sm font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>{texts?.activeHectares || 'Hectáreas Activas'}</span>
@@ -92,7 +122,6 @@ export const DashboardView = ({ isDarkMode, texts }) => {
             </div>
         </div>
 
-        {/* Tarjeta 3: Costos Mensuales */}
         <div className={cardClass}>
             <div className="flex items-center justify-between gap-4">
                 <span className={`text-sm font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>{texts?.monthlyCosts || 'Costos Mensuales'}</span>
@@ -101,12 +130,11 @@ export const DashboardView = ({ isDarkMode, texts }) => {
             <div className="mt-4">
                 <p className="text-3xl font-extrabold tracking-tight">${totalMonthlyExpenses.toLocaleString()}</p>
                 <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mt-1">
-                    Control contable activo
+                    Control contable cloud
                 </p>
             </div>
         </div>
 
-        {/* Tarjeta 4: Alertas Sanitarias */}
         <div className={cardClass}>
             <div className="flex items-center justify-between gap-4">
                 <span className={`text-sm font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>{texts?.sanitaryAlerts || 'Alertas Sanitarias'}</span>
@@ -121,10 +149,8 @@ export const DashboardView = ({ isDarkMode, texts }) => {
         </div>
       </section>
 
-      {/* Área Inferior: Carga por Potrero (Izq) y Asistente IA Corregido (Der) */}
+      {/* Área Inferior */}
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-        
-        {/* Distribución de Carga por Potrero */}
         <div className={`${cardClass} lg:col-span-2 space-y-6`}>
           <div className="flex items-center justify-between">
             <div>
@@ -140,32 +166,35 @@ export const DashboardView = ({ isDarkMode, texts }) => {
 
           {potreros.length === 0 ? (
             <div className="py-12 text-center text-slate-400 text-xs">
-              No hay potreros registrados para calcular ocupación. Añade lotes en la sección de Hectáreas.
+              No hay potreros registrados en la nube. Añade lotes en la sección de Hectáreas.
             </div>
           ) : (
             <div className="space-y-4">
               {potreros.map((lot, idx) => (
-                <div key={idx} className={`flex items-center justify-between gap-4 p-4 rounded-2xl border transition-colors ${
+                <div key={lot.id || idx} className={`flex items-center justify-between gap-4 p-4 rounded-2xl border transition-colors ${
                   isDarkMode ? 'bg-slate-950/50 border-slate-800 text-slate-200' : 'bg-slate-50 border-slate-100 text-slate-800'
                 }`}>
-                  <span className="text-xs font-bold">{lot.name}</span>
+                  <span className="text-xs font-bold">{lot.name} ({lot.hectares} ha)</span>
                   <div className="flex-1 h-2.5 bg-slate-200 dark:bg-slate-800 rounded-full mx-6 overflow-hidden">
                     <div className="h-full bg-emerald-500 rounded-full w-[65%]"></div>
                   </div>
-                  <span className="text-xs font-bold tabular-nums">65% Ocupación</span>
+                  <span className="text-xs font-bold tabular-nums">{lot.status || 'Activo'}</span>
                 </div>
               ))}
             </div>
           )}
 
           <div className="pt-4 border-t border-inherit text-right">
-            <button className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer inline-flex items-center gap-1.5">
+            <button 
+              onClick={() => onNavigate && onNavigate('hectares')}
+              className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer inline-flex items-center gap-1.5"
+            >
               {texts?.viewAll || 'Ver todos los potreros'} <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
 
-        {/* Tarjeta Asistente IA Corregida (Diseño Oscuro Profesional y Coherente) */}
+        {/* Asistente IA */}
         <div className="bg-slate-950 border border-slate-800 rounded-3xl p-6 text-slate-100 space-y-5 shadow-xl sticky top-24">
             <div className="flex items-center justify-between gap-3">
                 <div className='flex items-center gap-3'>
@@ -185,34 +214,23 @@ export const DashboardView = ({ isDarkMode, texts }) => {
 
             <div className="space-y-4 pt-3 border-t border-slate-800/80">
                 <div className='flex gap-3 items-start'>
-                    <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-                    <div>
-                        <p className="text-xs font-bold text-amber-400">{texts?.pastureRisk || 'Riesgo de escasez de pasto'}</p>
-                        <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                          {texts?.pastureDetail || 'El sistema no detecta déficit crítico en los potreros actuales registrados.'}
-                        </p>
-                    </div>
-                </div>
-                
-                <div className='flex gap-3 items-start pt-3 border-t border-slate-800/80'>
                     <AlertTriangle className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
                     <div>
-                        <p className="text-xs font-bold text-emerald-400">Salud del Hato Sincronizada</p>
+                        <p className="text-xs font-bold text-emerald-400">Sincronización Cloud Óptima</p>
                         <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                          Todos los registros locales se encuentran estables dentro de los parámetros normales.
+                          La base de datos en Supabase está conectada y operando sin incidencias en el hato.
                         </p>
                     </div>
                 </div>
             </div>
         </div>
-
       </section>
 
-      {/* Footer de la App */}
+      {/* Footer */}
       <footer className={`flex items-center justify-between py-4 border-t mt-12 text-xs transition-colors ${
         isDarkMode ? 'border-slate-800 text-slate-500' : 'border-slate-100 text-slate-400'
       }`}>
-        <p>Sincronización en tiempo real con almacenamiento local</p>
+        <p>Sincronización en tiempo real con Supabase Cloud PostgreSQL</p>
         <p>RebañoPro Desktop Enterprise</p>
       </footer>
     </div>

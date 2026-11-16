@@ -339,7 +339,17 @@ export default function App() {
         </header>
 
         <main className="flex-1 p-8 max-w-7xl w-full mx-auto">
-          {currentView === 'dashboard' && <DashboardView isDarkMode={isDarkMode} texts={texts} />}
+         {currentView === 'dashboard' && (
+            <DashboardView 
+              isDarkMode={isDarkMode} 
+              texts={texts} 
+              onNavigate={setCurrentView}
+              onGenerateReport={() => {
+                setCurrentView('finance');
+                showToast(language === 'es' ? 'Redirigiendo a Finanzas para generar el reporte' : 'Redirecting to Finance to generate report', 'info');
+              }}
+            />
+          )}
           {currentView === 'inventory' && <InventoryView onNotify={showToast} texts={texts} />}
           {currentView === 'hectares' && <HectaresView onNotify={showToast} texts={texts} />}
           {currentView === 'finance' && <FinanceView onNotify={showToast} texts={texts} />}

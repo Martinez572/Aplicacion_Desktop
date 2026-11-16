@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabaseClient';
-import { Plus, DollarSign, TrendingUp, TrendingDown, Wallet, Loader2, Trash2 } from 'lucide-react';
+import { Plus, DollarSign, TrendingUp, TrendingDown, Wallet, Loader2, Trash2, FileText } from 'lucide-react';
 
 export const FinanceView = ({ onNotify, texts }) => {
   const [transactions, setTransactions] = useState([]);
@@ -8,7 +8,6 @@ export const FinanceView = ({ onNotify, texts }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Formulario para nueva transacción
   const [formData, setFormData] = useState({
     type: 'Ingreso',
     category: 'Venta de Ganado',
@@ -17,7 +16,6 @@ export const FinanceView = ({ onNotify, texts }) => {
     date: new Date().toISOString().split('T')[0]
   });
 
-  // Cargar transacciones desde Supabase al montar
   useEffect(() => {
     fetchTransactions();
   }, []);
@@ -40,7 +38,6 @@ export const FinanceView = ({ onNotify, texts }) => {
     }
   };
 
-  // Registrar nueva transacción en Supabase
   const handleCreateTransaction = async (e) => {
     e.preventDefault();
     setSubmitting(true);
@@ -82,7 +79,6 @@ export const FinanceView = ({ onNotify, texts }) => {
     }
   };
 
-  // Eliminar transacción
   const handleDelete = async (id) => {
     if (!window.confirm('¿Estás seguro de eliminar este registro contable?')) return;
 
@@ -98,20 +94,115 @@ export const FinanceView = ({ onNotify, texts }) => {
     }
   };
 
-  // Cálculos financieros globales
-  const totalIncome = transactions
-    .filter(t => t.type === 'Ingreso')
-    .reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
+  // 📄 Generador de Reporte PDF Ejecutivo con Feedback Financiero Completo
+  const handleGeneratePDFReport = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      onNotify('Habilita las ventanas emergentes para generar el reporte', 'error');
+      return;
+    }
 
-  const totalExpense = transactions
-    .filter(t => t.type === 'Gasto')
-    .reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
+    const totalIncome = transactions.filter(t => t.type === 'Ingreso').reduce((acc, t) => acc + Number(t.amount), 0);
+    const totalExpense = transactions.filter(t => t.type === 'Gasto').reduce((acc, t) => acc + Number(t.amount), 0);
+    const netBalance = totalIncome - totalExpense;
 
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html lang="es">
+      <head>
+        <meta charset="UTF-8">
+        <title>Reporte Financiero Oficial - RebañoPro Cloud</title>
+        <style>
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #1e293b; padding: 40px; margin: 0; background: #ffffff; }
+          .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #059669; padding-bottom: 20px; margin-bottom: 30px; }
+          .logo { font-size: 26px; font-weight: 900; color: #059669; }
+          .meta { font-size: 12px; color: #64748b; text-align: right; }
+          .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 35px; }
+          .card { background: #f8fafc; border: 1px solid #e2e8f0; padding: 20px; border-radius: 12px; }
+          .card h4 { margin: 0 0 8px 0; font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+          .card p { margin: 0; font-size: 22px; font-weight: 800; }
+          h3 { font-size: 16px; color: #0f172a; border-left: 4px solid #059669; padding-left: 10px; margin-bottom: 15px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
+          th, td { border: 1px solid #e2e8f0; padding: 12px; text-align: left; }
+          th { background: #f1f5f9; color: #334155; font-weight: bold; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; }
+          .badge-ingreso { color: #059669; font-weight: bold; background: #ecfdf5; padding: 4px 8px; border-radius: 6px; }
+          .badge-gasto { color: #e11d48; font-weight: bold; background: #fff1f2; padding: 4px 8px; border-radius: 6px; }
+          .footer { margin-top: 50px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 20px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="logo">🐂 RebañoPro Cloud Enterprise</div>
+          <div class="meta">
+            <strong>Estado de Resultados Operativos</strong><br/>
+            Fecha de emisión: ${new Date().toLocaleDateString()}
+          </div>
+        </div>
+
+        <div class="summary">
+          <div class="card">
+            <h4>Balance Neto (Feedback)</h4>
+            <p style="color: ${netBalance >= 0 ? '#059669' : '#e11d48'}">$${netBalance.toLocaleString()}</p>
+          </div>
+          <div class="card">
+            <h4>Ingresos Totales</h4>
+            <p style="color: #059669">$${totalIncome.toLocaleString()}</p>
+          </div>
+          <div class="card">
+            <h4>Gastos Operativos</h4>
+            <p style="color: #e11d48">$${totalExpense.toLocaleString()}</p>
+          </div>
+        </div>
+
+        <h3>Detalle Histórico de Movimientos</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Tipo</th>
+              <th>Categoría</th>
+              <th>Descripción</th>
+              <th>Monto</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${transactions.length === 0 ? '<tr><td colspan="5" style="text-align:center; color:#94a3b8;">No hay registros contables</td></tr>' : 
+              transactions.map(t => `
+                <tr>
+                  <td>${t.date}</td>
+                  <td><span class="${t.type === 'Ingreso' ? 'badge-ingreso' : 'badge-gasto'}">${t.type}</span></td>
+                  <td>${t.category}</td>
+                  <td>${t.description || 'Sin descripción'}</td>
+                  <td><strong>$${Number(t.amount).toLocaleString()}</strong></td>
+                </tr>
+              `).join('')
+            }
+          </tbody>
+        </table>
+
+        <div class="footer">
+          Generado automáticamente por RebañoPro SaaS &bull; Plataforma de Gestión Pecuaria Inteligente
+        </div>
+
+        <script>
+          window.onload = function() { window.print(); }
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+    onNotify('Generando reporte PDF ejecutivo...', 'success');
+  };
+
+  const totalIncome = transactions.filter(t => t.type === 'Ingreso').reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
+  const totalExpense = transactions.filter(t => t.type === 'Gasto').reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
   const netBalance = totalIncome - totalExpense;
 
   return (
     <div className="space-y-8 animate-fadeIn">
-      {/* Cabecera de la Vista */}
+      {/* Cabecera con Botón de Reporte PDF */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-none transition-colors">
         <div>
           <span className="text-xs font-bold tracking-widest text-emerald-600 dark:text-emerald-400 uppercase bg-emerald-50 dark:bg-emerald-950/50 px-3 py-1 rounded-full border border-emerald-100 dark:border-emerald-900/50">
@@ -125,13 +216,23 @@ export const FinanceView = ({ onNotify, texts }) => {
           </p>
         </div>
 
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center justify-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-2xl shadow-lg shadow-emerald-600/25 transition-all cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          <span>{texts?.finAddBtn || 'Registrar Transacción'}</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleGeneratePDFReport}
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-2xl transition-all cursor-pointer border border-slate-200 dark:border-slate-700"
+          >
+            <FileText className="w-4 h-4 text-emerald-600" />
+            <span>{texts?.finReportBtn || 'Generar Reporte PDF'}</span>
+          </button>
+
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center justify-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-2xl shadow-lg shadow-emerald-600/25 transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>{texts?.finAddBtn || 'Registrar Transacción'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Tarjetas de Métricas Financieras */}
@@ -176,7 +277,7 @@ export const FinanceView = ({ onNotify, texts }) => {
         </div>
       </div>
 
-      {/* Contenido Principal: Listado de Transacciones */}
+      {/* Listado de Transacciones */}
       {loading ? (
         <div className="flex items-center justify-center py-20 bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-xl">
           <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" />
@@ -249,18 +350,13 @@ export const FinanceView = ({ onNotify, texts }) => {
         </div>
       )}
 
-      {/* Modal Flotante de Registro */}
+      {/* Modal Flotante */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fadeIn">
           <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-2xl p-8 transition-colors">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-extrabold text-slate-900 dark:text-white">Registrar Transacción</h3>
-              <button 
-                onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm font-bold"
-              >
-                ✕
-              </button>
+              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm font-bold">✕</button>
             </div>
 
             <form onSubmit={handleCreateTransaction} className="space-y-4">
