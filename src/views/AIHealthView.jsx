@@ -32,11 +32,17 @@ export const AIHealthView = ({ texts }) => {
     setLoading(true);
 
     try {
-      // Tu clave de API oficial de Gemini
-      const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';      let aiResponse = '';
+      // Leer la clave de API oficial de Gemini desde las variables de entorno de Vite
+      const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || ''; 
+      
+      if (!GEMINI_API_KEY) {
+        throw new Error('Falta definir VITE_GEMINI_API_KEY en tu archivo .env');
+      }
 
-      // Conexión real con el modelo Gemini Flash
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
+      let aiResponse = '';
+
+      // ⚡ CORRECCIÓN CLAVE: Actualizado al modelo gemini-3.8-flash que exige la API actual
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${GEMINI_API_KEY}`;
       
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -79,7 +85,7 @@ export const AIHealthView = ({ texts }) => {
           ...updatedHistory, 
           { 
             role: 'assistant', 
-            content: `⚠️ Error de conexión con Gemini: ${error.message}. Por favor, verifica tu clave de API o conexión.` 
+            content: `⚠️ Error de conexión con Gemini: ${error.message}. Por favor, verifica tu clave de API en el archivo .env y reinicia el servidor.` 
           }
         ]
       });
@@ -95,10 +101,10 @@ export const AIHealthView = ({ texts }) => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <span className="text-[11px] font-semibold tracking-wider text-emerald-600 uppercase bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">
-            {texts.aiTag}
+            {texts?.aiTag || 'Inteligencia Artificial Pecuaria'}
           </span>
-          <h1 className="text-2xl font-bold text-slate-800 tracking-tight mt-1">{texts.aiTitle}</h1>
-          <p className="text-sm text-slate-500 mt-1">{texts.aiSub}</p>
+          <h1 className="text-2xl font-bold text-slate-800 tracking-tight mt-1">{texts?.aiTitle || 'Centro de Decisiones e IA'}</h1>
+          <p className="text-sm text-slate-500 mt-1">{texts?.aiSub || 'Asistencia experta en diagnóstico veterinario y consultoría integral.'}</p>
         </div>
       </div>
 
@@ -112,7 +118,7 @@ export const AIHealthView = ({ texts }) => {
               : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
           }`}
         >
-          <Stethoscope className="w-4 h-4" /> {texts.aiTabVet}
+          <Stethoscope className="w-4 h-4" /> {texts?.aiTabVet || 'Asistencia Veterinaria'}
         </button>
         <button
           onClick={() => setActiveTab('financial')}
@@ -122,7 +128,7 @@ export const AIHealthView = ({ texts }) => {
               : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
           }`}
         >
-          <DollarSign className="w-4 h-4" /> {texts.aiTabFin}
+          <DollarSign className="w-4 h-4" /> {texts?.aiTabFin || 'Ayuda Financiera y Costos'}
         </button>
         <button
           onClick={() => setActiveTab('general')}
@@ -132,7 +138,7 @@ export const AIHealthView = ({ texts }) => {
               : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
           }`}
         >
-          <Sparkles className="w-4 h-4" /> {texts.aiTabGen}
+          <Sparkles className="w-4 h-4" /> {texts?.aiTabGen || 'Consultor General de Hato'}
         </button>
       </div>
 
@@ -207,7 +213,7 @@ export const AIHealthView = ({ texts }) => {
             disabled={loading}
             className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-5 py-3 rounded-xl shadow-md shadow-emerald-600/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
           >
-            <Send className="w-4 h-4" /> {texts.aiSend}
+            <Send className="w-4 h-4" /> {texts?.aiSend || 'Enviar Consulta'}
           </button>
         </form>
 
