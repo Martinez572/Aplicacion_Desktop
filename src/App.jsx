@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { supabase } from './services/supabaseClient';
 import { Sidebar } from './components/layout/Sidebar';
 import { DashboardView } from './views/DashboardView';
 import { InventoryView } from './views/InventoryView';
@@ -7,15 +8,13 @@ import { FinanceView } from './views/FinanceView';
 import { AIHealthView } from './views/AIHealthView';
 import { AuthView } from './views/AuthView';
 import { Toast } from './components/common/Toast';
-import { Sun, Moon, Globe } from 'lucide-react';
+import { Sun, Moon, Globe, Loader2 } from 'lucide-react';
 
 export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return localStorage.getItem('rebanopro_user') !== null;
-  });
-  const [currentUser, setCurrentUser] = useState(() => {
-    return JSON.parse(localStorage.getItem('rebanopro_user')) || null;
-  });
+  // Estados de autenticación conectados a Supabase
+  const [session, setSession] = useState(null);
+  const [loadingSession, setLoadingSession] = useState(true);
+  const [currentUser, setCurrentUser] = useState(null);
   
   const [currentView, setCurrentView] = useState('dashboard');
   const [toast, setToast] = useState(null);
@@ -28,6 +27,25 @@ export default function App() {
     return localStorage.getItem('rebanopro_lang') || 'es';
   });
 
+  // Sincronizar sesión con Supabase al cargar la app
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setCurrentUser(session?.user || null);
+      setLoadingSession(false);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setCurrentUser(session?.user || null);
+      setLoadingSession(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
   useEffect(() => {
     localStorage.setItem('rebanopro_theme', isDarkMode ? 'dark' : 'light');
   }, [isDarkMode]);
@@ -37,6 +55,10 @@ export default function App() {
   }, [language]);
 
   const triggerToast = (message, type = 'success') => {
+    setToastedState({ message, type });
+  };
+  // (Mantenemos tu función original de toast tal como la tenías)
+  const showToast = (message, type = 'success') => {
     setToast({ message, type });
   };
 
@@ -214,13 +236,28 @@ export default function App() {
 
   const texts = t[language];
 
-  if (!isAuthenticated) {
+  // Pantalla de carga mientras Supabase verifica la sesión activa
+  if (loadingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="w-12 h-12 bg-emerald-600 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-600/30 animate-pulse">
+            <Loader2 className="w-6 h-6 text-white animate-spin" />
+          </div>
+          <p className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest">
+            Cargando RebañoPro Cloud...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Si no hay sesión en Supabase, mostramos la vista de Autenticación
+  if (!session) {
     return (
       <AuthView 
         onLoginSuccess={(user) => {
-          setIsAuthenticated(true);
-          setCurrentUser(user);
-          triggerToast(language === 'es' ? `¡Bienvenido de nuevo, ${user.name || 'Productor'}!` : `Welcome back, ${user.name || 'Producer'}!`);
+          showToast(language === 'es' ? `¡Bienvenido de nuevo, ${user?.email || 'Productor'}!` : `Welcome back, ${user?.email || 'Producer'}!`);
         }} 
       />
     );
@@ -255,7 +292,7 @@ export default function App() {
               onClick={() => {
                 const newLang = language === 'es' ? 'en' : 'es';
                 setLanguage(newLang);
-                triggerToast(newLang === 'es' ? 'Idioma cambiado a Español' : 'Language switched to English', 'info');
+                showToast(newLang === 'es' ? 'Idioma cambiado a Español' : 'Language switched to English', 'info');
               }}
               className={`p-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer border ${
                 isDarkMode 
@@ -270,7 +307,7 @@ export default function App() {
             <button
               onClick={() => {
                 setIsDarkMode(!isDarkMode);
-                triggerToast(!isDarkMode ? 'Modo Oscuro activado' : 'Modo Claro activado', 'info');
+                showToast(!isDarkMode ? 'Modo Oscuro activado' : 'Modo Claro activado', 'info');
               }}
               className={`p-2 rounded-xl transition-all cursor-pointer border ${
                 isDarkMode 
@@ -284,15 +321,13 @@ export default function App() {
             <div className={`h-4 w-[1px] ${isDarkMode ? 'bg-slate-800' : 'bg-slate-200'}`}></div>
 
             <span className={`text-xs font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-              {currentUser?.name || currentUser?.email || 'Productor'}
+              {currentUser?.email || 'Productor'}
             </span>
 
             <button
-              onClick={() => {
-                localStorage.removeItem('rebanopro_user');
-                setIsAuthenticated(false);
-                setCurrentUser(null);
-                triggerToast(texts.logout, 'info');
+              onClick={async () => {
+                await supabase.auth.signOut();
+                showToast(texts.logout, 'info');
               }}
               className={`text-xs font-semibold transition-colors cursor-pointer border-l pl-4 ${
                 isDarkMode ? 'border-slate-800 text-slate-400 hover:text-rose-400' : 'border-slate-200 text-slate-400 hover:text-rose-600'
@@ -305,9 +340,9 @@ export default function App() {
 
         <main className="flex-1 p-8 max-w-7xl w-full mx-auto">
           {currentView === 'dashboard' && <DashboardView isDarkMode={isDarkMode} texts={texts} />}
-          {currentView === 'inventory' && <InventoryView onNotify={triggerToast} texts={texts} />}
-          {currentView === 'hectares' && <HectaresView onNotify={triggerToast} texts={texts} />}
-          {currentView === 'finance' && <FinanceView onNotify={triggerToast} texts={texts} />}
+          {currentView === 'inventory' && <InventoryView onNotify={showToast} texts={texts} />}
+          {currentView === 'hectares' && <HectaresView onNotify={showToast} texts={texts} />}
+          {currentView === 'finance' && <FinanceView onNotify={showToast} texts={texts} />}
           {currentView === 'ai-health' && <AIHealthView texts={texts} />}
         </main>
       </div>
