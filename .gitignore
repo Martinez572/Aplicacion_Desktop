@@ -1,4 +1,16 @@
 .env
+
+# Dependencias
+node_modules/
+
+# Builds web y de escritorio (¡Muy importante para no subir Gigabytes innecesarios!)
+dist/
+src-tauri/target/
+
+# Entornos y logs
+.env
+*.log
+.DS_Store
 # Logs
 logs
 *.log
